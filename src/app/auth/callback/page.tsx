@@ -10,17 +10,11 @@ export default function Callback() {
   useEffect(() => {
     const handle = async () => {
       try {
-        // 🔥 CRITICAL FIX: resolve session from URL
-        const { error } =
-          await supabase.auth.exchangeCodeForSession(window.location.href);
+        // 🔥 Handles BOTH:
+        // - PKCE (?code=)
+        // - implicit (#access_token=)
+        await supabase.auth.getSession();
 
-        if (error) {
-          console.error("Auth error:", error.message);
-          router.push("/login");
-          return;
-        }
-
-        // ✅ NOW session will exist
         const { data } = await supabase.auth.getSession();
 
         if (!data.session) {
@@ -30,7 +24,7 @@ export default function Callback() {
 
         const user = data.session.user;
 
-        // 🔥 PROFILE CHECK (your original logic)
+        // 🔥 ROLE LOGIC (your original)
         const { data: profile } = await supabase
           .from("profiles")
           .select("role")
@@ -53,7 +47,7 @@ export default function Callback() {
         else router.push("/dashboard");
 
       } catch (err) {
-        console.error("Callback crash:", err);
+        console.error("Callback error:", err);
         router.push("/login");
       }
     };
