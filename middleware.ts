@@ -23,14 +23,20 @@ export async function middleware(req: NextRequest) {
     }
   );
 
-  // 🔥 Get user
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   const pathname = req.nextUrl.pathname;
 
-  // 🔒 PROTECTED ROUTES
+  // ✅ VERY IMPORTANT: allow callback route
+  if (pathname.startsWith("/auth/callback")) {
+    return res;
+  }
+
+  // ✅ use session (NOT getUser)
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const user = session?.user;
+
   const isAdminRoute = pathname.startsWith("/admin");
   const isFinanceRoute = pathname.startsWith("/finance");
   const isDashboardRoute = pathname.startsWith("/dashboard");
@@ -42,7 +48,7 @@ export async function middleware(req: NextRequest) {
     return res;
   }
 
-  // 🔥 Get role
+  // 🔥 role check
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
@@ -51,7 +57,6 @@ export async function middleware(req: NextRequest) {
 
   const role = profile?.role;
 
-  // 🔒 ROLE CHECKS
   if (isAdminRoute && role !== "admin") {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
@@ -60,7 +65,6 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
-  // guardians can access dashboard only
   if (isDashboardRoute && !["guardian", "admin", "finance"].includes(role)) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
@@ -68,7 +72,6 @@ export async function middleware(req: NextRequest) {
   return res;
 }
 
-// 🔥 Apply to routes
 export const config = {
   matcher: ["/admin/:path*", "/finance/:path*", "/dashboard/:path*"],
 };
