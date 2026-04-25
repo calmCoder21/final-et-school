@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -14,60 +13,47 @@ export default function LoginPage() {
   const handleLogin = async () => {
     setLoading(true);
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
-      alert(error.message);
+      if (error) throw error;
+
+      if (!data.user) throw new Error("Login failed");
+
+      // 🔥 ensure session is ready
+      await supabase.auth.getSession();
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", data.user.id)
+        .maybeSingle();
+
+      if (!profile) {
+        throw new Error("Profile not found");
+      }
+
+      if (profile.role === "admin") router.push("/admin");
+      else if (profile.role === "finance") router.push("/finance");
+      else router.push("/dashboard");
+
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
       setLoading(false);
-      return;
-    }
-
-    const user = data.user;
-
-    if (!user) {
-      alert("Login failed");
-      setLoading(false);
-      return;
-    }
-
-    const { data: profile, error: profileErr } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (profileErr) {
-      alert("Error loading profile");
-      setLoading(false);
-      return;
-    }
-
-    if (!profile) {
-      alert("User profile not found. Contact admin.");
-      setLoading(false);
-      return;
-    }
-
-    if (profile.role === "admin") {
-      router.push("/admin");
-    } else if (profile.role === "finance") {
-      router.push("/finance");
-    } else {
-      router.push("/dashboard");
     }
   };
 
-  // 🔥 GOOGLE LOGIN
   const handleGoogle = async () => {
     setLoading(true);
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: "https://final-et-school.vercel.app/auth/callback",
+        redirectTo: "https://final-et-school.vercel.app/auth/callback", // 🔥 MUST MATCH YOUR DOMAIN
       },
     });
 
@@ -81,7 +67,6 @@ export default function LoginPage() {
     <div className="p-10 max-w-md mx-auto space-y-4">
       <h1 className="text-2xl font-bold">Login</h1>
 
-      {/* GOOGLE */}
       <button
         onClick={handleGoogle}
         className="bg-red-600 text-white px-4 py-2 w-full"
@@ -105,7 +90,6 @@ export default function LoginPage() {
         onChange={(e) => setPassword(e.target.value)}
       />
 
-      {/* 🔥 FORGOT PASSWORD LINK */}
       <p
         className="text-sm text-blue-600 cursor-pointer text-right"
         onClick={() => router.push("/forgot-password")}
